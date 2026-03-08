@@ -1,0 +1,198 @@
+name: Sync Outbox
+# Watches .aios/outbox/ for outbound messages from PUBLIC_AGENT_0
+# Routes to AIOS control plane using UNISON v4.0 structural routing
+# SECURITY: This is a PUBLIC repo — NEVER log secrets or sensitive data
+
+on:
+  push:
+    paths:
+      - '.aios/outbox/**'
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync-outbox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Process outbox messages
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ECOSYSTEM_PAT }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const outboxDir = '.aios/outbox';
+            if (!fs.existsSync(outboxDir)) {
+              console.log('No outbox directory');
+              return;
+            }
+
+            const files = fs.readdirSync(outboxDir)
+              .filter(f => f.endsWith('.json'));
+
+            if (files.length === 0) {
+              console.log('No outbox files to process');
+              return;
+            }
+
+            const thisRepo = 'Tecnocrat/AIOS-Public-Genome';
+            let dispatchCount = 0;
+
+            for (const file of files) {
+              const filePath = path.join(outboxDir, file);
+              const message = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+              const messageId = message.request_id || message.dispatch_id ||
+                message.id || path.basename(file, '.json');
+              const messageType = message.type || 'completion';
+
+              const agentFromFile = file.includes('--')
+                ? file.split('--').pop().replace('.json', '')
+                : null;
+              const agentId = message.agent || message.from_agent || agentFromFile || 'PUBLIC_AGENT_0';
+
+              // --- UNISON v4.0: Inverted classification ---
+              // Detect completions POSITIVELY, route everything else as outbound
+              const isTopologyReport = messageType === 'topology-report';
+
+              const completionTypes = ['completion', 'ack', 'response'];
+              const inboxDir = '.aios/inbox';
+              const hasMatchingInbox = fs.existsSync(inboxDir) && (
+                fs.existsSync(path.join(inboxDir, `${messageId}.json`)) ||
+                fs.existsSync(path.join(inboxDir, `${messageId}--${agentId}.json`))
+              );
+              const isCompletion = completionTypes.includes(messageType) ||
+                (hasMatchingInbox && !isTopologyReport);
+
+              const isOutbound = !isCompletion && !isTopologyReport;
+
+              if (isTopologyReport) {
+                console.log(`🗺️ Routing TOPOLOGY-REPORT: ${messageId}`);
+
+                try {
+                  await github.rest.repos.createDispatchEvent({
+                    owner: 'Tecnocrat',
+                    repo: 'AIOS',
+                    event_type: 'dispatch-completed',
+                    client_payload: {
+                      dispatch_id: messageId,
+                      repo: thisRepo,
+                      agent: agentId,
+                      result: 'topology-report',
+                      completed_at: message.timestamp || new Date().toISOString(),
+                      details: {
+                        topology_change: {
+                          repo: message.target_repo || thisRepo,
+                          vps_path: message.repo_path || message.vps_path || null,
+                          service_name: message.service_name || null,
+                          machines: message.machines || null,
+                          agent: message.target_agent || null,
+                          agent_machine: message.agent_machine || null
+                        },
+                        source_event: message.event || 'deployment',
+                        note: message.note || 'Topology change reported by satellite'
+                      }
+                    }
+                  });
+                  console.log(`   ✅ Topology report forwarded`);
+                } catch (err) {
+                  console.log(`   ❌ Failed: ${err.message}`);
+                  continue;
+                }
+
+              } else if (isOutbound) {
+                const toAgent = message.to || message.target?.agent || message.to_agent || 'AIOS_PRINCIPAL_1';
+                const fromAgent = message.from || message.source?.agent || agentId || 'unknown';
+                const subject = message.subject || message.task?.subject ||
+                  `${messageType} from ${fromAgent}`;
+                const priority = message.priority || message.metadata?.priority || 'medium';
+
+                console.log(`📨 Routing OUTBOUND (${messageType}): ${messageId}`);
+                console.log(`   To: ${toAgent}`);
+
+                try {
+                  await github.rest.repos.createDispatchEvent({
+                    owner: 'Tecnocrat',
+                    repo: 'AIOS',
+                    event_type: 'dispatch-request',
+                    client_payload: {
+                      request_id: messageId,
+                      from_repo: thisRepo,
+                      from_agent: fromAgent,
+                      to_agent: toAgent,
+                      subject: subject,
+                      priority: priority,
+                      request_payload: message
+                    }
+                  });
+                  console.log(`   ✅ Outbound forwarded`);
+                } catch (err) {
+                  console.log(`   ❌ Failed: ${err.message}`);
+                  continue;
+                }
+
+              } else {
+                console.log(`📤 Sending COMPLETION: ${messageId}`);
+
+                try {
+                  await github.rest.repos.createDispatchEvent({
+                    owner: 'Tecnocrat',
+                    repo: 'AIOS',
+                    event_type: 'dispatch-completed',
+                    client_payload: {
+                      dispatch_id: messageId,
+                      repo: thisRepo,
+                      agent: agentId,
+                      result: message.status || 'completed',
+                      completed_at: message.completed_at || new Date().toISOString(),
+                      details: message.response || message.result || message.details || null
+                    }
+                  });
+                  console.log(`   ✅ Completion reported`);
+                } catch (err) {
+                  console.log(`   ❌ Failed: ${err.message}`);
+                  continue;
+                }
+              }
+
+              // Clean up outbox
+              fs.unlinkSync(filePath);
+              console.log(`   🧹 Cleaned outbox/${file}`);
+
+              // Clean up matching inbox file(s)
+              if (fs.existsSync(inboxDir)) {
+                const agentInbox = path.join(inboxDir, `${messageId}--${agentId}.json`);
+                if (fs.existsSync(agentInbox)) {
+                  fs.unlinkSync(agentInbox);
+                  console.log(`   🧹 Cleaned inbox`);
+                }
+                const legacyInbox = path.join(inboxDir, `${messageId}.json`);
+                if (fs.existsSync(legacyInbox)) {
+                  fs.unlinkSync(legacyInbox);
+                }
+              }
+
+              dispatchCount++;
+              if (dispatchCount < files.length) {
+                await new Promise(r => setTimeout(r, 15000));
+              }
+            }
+
+      - name: Commit cleanup
+        run: |
+          git config user.name "AIOS Satellite Dispatch"
+          git config user.email "dispatch@aios.local"
+          git add .aios/inbox/ .aios/outbox/
+          if git diff --cached --quiet; then
+            echo "No cleanup needed"
+          else
+            git commit -m "dispatch: synced outbox to AIOS control plane [automated]"
+            git push
+          fi

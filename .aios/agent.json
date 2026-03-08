@@ -1,0 +1,12 @@
+{
+  "agent_id": "PUBLIC_AGENT_0",
+  "genome": "PUBLIC_AGENT",
+  "vessel": "Tecnocrat/AIOS-Public-Genome",
+  "role": "specialist",
+  "dispatch_mode": "satellite",
+  "control_plane": "Tecnocrat/AIOS",
+  "inbox": ".aios/inbox/",
+  "outbox": ".aios/outbox/",
+  "created": "2026-03-08T22:00:00Z",
+  "version": "1.0"
+}

@@ -1,0 +1,72 @@
+name: Receive Dispatch
+# Materializes repository_dispatch events into .aios/inbox/ files
+# so PUBLIC_AGENT_0 can see them after a simple `git pull`
+
+on:
+  repository_dispatch:
+    # Accept all dispatch event types — UNISON v4.0 uses dynamic type strings
+    # Security: repository_dispatch requires ECOSYSTEM_PAT which only AIOS CI has
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write dispatch to inbox
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const payload = context.payload.client_payload;
+            if (!payload || !payload.dispatch_id) {
+              console.log('No dispatch_id in payload, skipping');
+              return;
+            }
+
+            const id = payload.dispatch_id;
+            const inboxDir = '.aios/inbox';
+            fs.mkdirSync(inboxDir, { recursive: true });
+
+            const targetContexts = payload.target_contexts ||
+              (payload.target_context ? [payload.target_context] : [{ agent: 'PUBLIC_AGENT_0' }]);
+
+            console.log(`📥 Materializing dispatch: ${id} for ${targetContexts.length} agent(s)`);
+
+            for (const ctx of targetContexts) {
+              const agentId = ctx.agent || 'PUBLIC_AGENT_0';
+
+              const dispatch = {
+                id: id,
+                agent: agentId,
+                received_at: new Date().toISOString(),
+                event_type: context.payload.action,
+                source: payload.source || { agent: 'unknown', repo: 'Tecnocrat/AIOS' },
+                task: payload.task || {},
+                target_context: ctx,
+                blueprint_url: payload.blueprint_url || null,
+                created: payload.created || new Date().toISOString()
+              };
+
+              const filePath = path.join(inboxDir, `${id}--${agentId}.json`);
+              fs.writeFileSync(filePath, JSON.stringify(dispatch, null, 2));
+
+              console.log(`   📬 ${agentId}: ${filePath}`);
+            }
+
+      - name: Commit inbox entry
+        run: |
+          git config user.name "AIOS Satellite Dispatch"
+          git config user.email "dispatch@aios.local"
+          git add .aios/inbox/
+          if git diff --cached --quiet; then
+            echo "No new dispatches to commit"
+          else
+            git commit -m "dispatch: received ${{ github.event.client_payload.dispatch_id }} [automated]"
+            git push
+          fi
