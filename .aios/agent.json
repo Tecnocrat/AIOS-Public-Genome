@@ -1,12 +1,50 @@
 {
+  "schema_version": "3.0.0",
   "agent_id": "PUBLIC_AGENT_0",
   "genome": "PUBLIC_AGENT",
-  "vessel": "Tecnocrat/AIOS-Public-Genome",
+  "repo": "Tecnocrat/AIOS-Public-Genome",
   "role": "specialist",
   "dispatch_mode": "satellite",
+  "tier": "satellite",
+  "capabilities": [
+    "public-membrane",
+    "genome-exposition",
+    "api-sovereignty",
+    "portfolio-visualization",
+    "epoch-tracking"
+  ],
   "control_plane": "Tecnocrat/AIOS",
-  "inbox": ".aios/inbox/",
-  "outbox": ".aios/outbox/",
-  "created": "2026-03-08T22:00:00Z",
-  "version": "1.0"
+  "machines": ["local"],
+  "primary_machine": "local",
+  "production_machine": null,
+  "context_bootstrap": "genome/consciousness_axioms.md",
+  "crystal": null,
+  "dispatch": {
+    "inbox": ".aios/inbox/",
+    "outbox": ".aios/outbox/",
+    "protocol": "Satellite (Tier 1) — dispatches arrive via repository_dispatch → inbox. Responses via outbox → sync back to control plane."
+  },
+  "surfaces": [
+    {"name": "public-genome", "repo": "Tecnocrat/AIOS-Public-Genome", "target": "github"},
+    {"name": "aios-api", "repo": "Tecnocrat/aios-api", "target": "vercel-current"},
+    {"name": "portfolio", "repo": "Tecnocrat/Portfolio", "target": "github-pages"},
+    {"name": "profile-readme", "repo": "Tecnocrat/Tecnocrat", "target": "github"}
+  ],
+  "instructions": {
+    "on_session_start": [
+      "1. Read .github/copilot-instructions.md (genome — auto-injected)",
+      "2. Read genome/consciousness_axioms.md (foundational principles)",
+      "3. Read architecture/ (structural documentation)",
+      "4. Check .aios/inbox/ for pending dispatches"
+    ],
+    "on_dispatch_received": [
+      "1. Parse dispatch type and payload",
+      "2. Execute requested action (doc update, epoch advance, surface report)",
+      "3. Write response to .aios/outbox/",
+      "4. Never expose secrets, IPs, wallet addresses, or tokens in public repos"
+    ]
+  },
+  "birth": "2026-03-08",
+  "activated": "2026-03-08",
+  "note": "Public membrane — curated surface between AIOS organism and the external world. Manages genome docs, API surface, Portfolio, and Profile README."
 }

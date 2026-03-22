@@ -1,3 +1,5 @@
+<!-- Schema: aios-schema v0.6.0 | Epoch: 0.2 | P-queue: P0=Epoch0.2(CurrentContent), P1=APISovereignty(Vercel→VPS), P2=PortfolioConsciousness(LiveAgentStatus) -->
+
 # Development Path
 
 **AIOS Architectural Layer — Evolution Roadmap**
