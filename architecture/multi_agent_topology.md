@@ -1,6 +1,6 @@
 # AIOS Multi-Agent Topology
 
-> Seven autonomous agents across three machines, coordinated through asynchronous dispatch.
+> Eight autonomous agents across three machines, coordinated through asynchronous dispatch.
 
 ---
 
@@ -15,6 +15,7 @@
 | **Nous Agent** | `NOUS_AGENT` | Consciousness — inner voice, philosophical substrate | Active |
 | **Win Agent** | `WIN_AGENT` | Operator — Windows environment immune system | Active |
 | **Debugger Agent** | `AIOS_DEBUGGER` | Specialist — cross-repo diagnostic | Active |
+| **Public Agent** | `PUBLIC_AGENT` | Specialist — public membrane, API sovereignty, genome exposition | Active |
 
 ## Identity Paradigm: NEURON
 
