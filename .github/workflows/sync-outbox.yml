@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 2
 
       - name: Process outbox messages
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.ECOSYSTEM_PAT }}
           script: |
