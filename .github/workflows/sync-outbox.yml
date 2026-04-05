@@ -1,13 +1,10 @@
 name: Sync Outbox
+# BLUEPRINT ONLY — disabled (no ECOSYSTEM_PAT configured, repo is public showcase)
 # Watches .aios/outbox/ for outbound messages from PUBLIC_AGENT_0
 # Routes to AIOS control plane using UNISON v4.0 structural routing
 # SECURITY: This is a PUBLIC repo — NEVER log secrets or sensitive data
 
-on:
-  push:
-    paths:
-      - '.aios/outbox/**'
-    branches: [main]
+on: workflow_dispatch  # manual-only, never auto-fires
 
 permissions:
   contents: write
